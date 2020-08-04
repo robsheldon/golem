@@ -156,13 +156,11 @@ ask () {
         warn "ask(): Non-zero timeout requires a default answer"
         exit 1
     fi
-    if [[ $required -ne 0 && -n "$default" ]]; then
-        warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
-        exit 1
-    fi
-    if [[ $required -ne 0 && timeout -gt 0 ]]; then
-        warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
-        exit 1
+    if [ $required -ne 0 ]; then
+        if [ -n "$default" -o $timeout -gt 0 ]; then
+            warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
+            exit 1
+        fi
     fi
     if [[ ! "$*" ]]; then
         warn "Missing question"
