@@ -70,14 +70,6 @@ _shell_resolve_cmd () {
 
 
 ##
-# my_ip4_address(): return the IPv4 address of the current runtime environment.
-# 
-my_ip4_address () {
-    echo $(ip route get 8.8.8.8 | awk '{print $NF; exit}')
-}
-
-
-##
 # _warn(): write a message to stderr.
 # 
 warn () {
