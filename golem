@@ -237,7 +237,7 @@ ask () {
 if [ $# -lt 1 ]; then
     # TODO: Needs a help subsystem.
     echo "No command provided"
-    exit 0
+    exit 1
 fi
 
 # Start a new blank line before any output if not in batch mode.
@@ -253,7 +253,14 @@ fi
 golem_script=`_shell_resolve_cmd "$@"`
 if [ -z "$golem_script" ]; then
     echo "Error: I don't understand \"$@\""
-    exit 0
+    exit 1
+fi
+
+if grep -q '^[[:space:]]*sudo ' "$golem_script"; then
+    if ! groups | grep -qw 'sudo'; then
+        echo "It looks like this command requires superuser access and you're not in the 'sudo' group"
+        exit 1
+    fi
 fi
 
 . "$golem_script"
