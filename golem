@@ -1,0 +1,263 @@
+#!/bin/bash
+# This script should be located at /usr/local/sbin/golem
+
+################################################################################
+#                                                                              #
+#    Globals                                                                   #
+#                                                                              #
+################################################################################
+
+# Name of this script.
+scriptname=`basename $_`
+# And the path.
+scriptpath=$(readlink -m "$0")
+scriptdir=$(dirname "$scriptpath")
+
+# barf and exit if an undefined variable is referenced.
+set -u
+
+# if any command in a pipeline fails, that return code will be used as the
+# return code of the whole pipeline.
+set -o pipefail
+
+# restrict newly created files to read/write by this user only.
+umask 077
+
+# Debug mode? 0 for no, anything else for yes.
+debug=0
+
+# Batch (quiet) mode?
+batch=0
+
+
+
+################################################################################
+#                                                                              #
+#    Functions                                                                 #
+#                                                                              #
+################################################################################
+
+##
+# _shell_resolve_cmd(): search for any golem scripts whose name matches the
+# command entered by the user, starting with the most complex filenames first.
+# 
+_shell_resolve_cmd () {
+    local golem_cmd=""
+    # The correct way to do this is to redirect the output from this
+    # nasty series of commands as a redirect into `done`, e.g.:
+    #     done < <(....)
+    # But older verions of Bash vomit when you try that. Piping doesn't
+    # work nicely on newer versions of Bash because it creates a subshell
+    # which prevents later code from accessing any variables that are set,
+    # exit doesn't work because the pipe is a subshell (it just exits the
+    # pipe). So ... early return from a function!
+    for cmdfile in `ls "$scriptdir/scripts"`; do strlen=`expr length $cmdfile`; echo $strlen $cmdfile; done | sort -rn | cut -d " " -f 2 | while read filename; do
+        if [ "$filename" != "common.sh" ]; then
+            # Turn the filename into a regular expression...
+            # (needs moar backslashes, sigh.)
+            regex=`echo "$filename" | sed "s/\(.*\).sh/^\1/g" | sed 's/_/[[:space:]]\\\\{1,\\\\}.*[[:space:]]*/g'`
+            # ...and then try to match it against the entered command.
+            matched=`echo "$@" | grep $regex`
+            if [ -n "$matched" ]; then
+                echo "$scriptdir/scripts/$filename"
+                return 0
+            fi
+        fi
+    done
+    echo ""
+    return 1
+}
+
+
+##
+# my_ip4_address(): return the IPv4 address of the current runtime environment.
+# 
+my_ip4_address () {
+    echo $(ip route get 8.8.8.8 | awk '{print $NF; exit}')
+}
+
+
+##
+# _warn(): write a message to stderr.
+# 
+warn () {
+    echo "$@" >&2
+}
+
+
+##
+# ask(): ask the user a question and process the response, handling defaults,
+# timeouts, and other options automatically.
+# 
+ask () {
+    # Options:
+    #     --timeout N:     time out if there's no input for N seconds.
+    #     --default ANS:   use ANS as the default answer on timeout or
+    #                      if an empty answer is provided.
+    #     --required:      don't accept a blank answer. Use this parameter
+    #                      to make ask() accept any string.
+    #
+    # ask() gives the answer in its exit status, e.g.,
+    # if ask "Continue?"; then ...
+    local ans=""
+    local waiting=1
+    local timeout=0
+    local required=0
+    local default=""
+    local prompt=""
+
+    while [[ "$1" ]]
+    do
+        case "$1" in
+            -d|--default)
+                shift
+                default=$1
+                if [[ ! "$default" ]]; then warn "Missing default value"; fi
+                default=$(tr '[:upper:]' '[:lower:]' <<< $default)
+                if [[ "$default" = "yes" ]]; then
+                    default="y"
+                elif [[ "$default" = "no" ]]; then
+                    default="n"
+                elif [ "$default" != "y" -a "$default" != "n" ]; then
+                    warn "Illegal default answer: $default"
+                fi
+                shift
+            ;;
+
+            -t|--timeout)
+                shift
+                if [[ ! "$1" ]]; then
+                    warn "Missing timeout value"
+                elif [[ ! "$1" =~ ^[0-9][0-9]*$ ]]; then
+                    warn "Illegal timeout value: $1"
+                else
+                    timeout=$1
+                fi
+                shift
+            ;;
+
+            -r|--required)
+                shift
+                required=1
+            ;;
+
+            -*)
+                warn "Unrecognized option: $1"
+            ;;
+
+            *)
+                break
+            ;;
+        esac
+    done
+
+    # Sanity checks
+    if [[ $timeout -ne 0  &&  ! "$default" ]]; then
+        warn "ask(): Non-zero timeout requires a default answer"
+        exit 1
+    fi
+    if [[ $required -ne 0 && -n "$default" ]]; then
+        warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
+        exit 1
+    fi
+    if [[ $required -ne 0 && timeout -gt 0 ]]; then
+        warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
+        exit 1
+    fi
+    if [[ ! "$*" ]]; then
+        warn "Missing question"
+        exit 1
+    fi
+
+    prompt="$*"
+    if [ "$default" = "y" ]; then
+        prompt="$prompt [Y/n] "
+    elif [ "$default" = "n" ]; then
+        prompt="$prompt [y/N] "
+    elif [ $required -eq 1 ]; then
+        prompt="$prompt (required) "
+    else
+        prompt="$prompt [y/n] "
+    fi
+
+
+    while [ -z "$ans" ]
+    do
+        if [[ $timeout -ne 0 ]]; then
+            if ! read -t $timeout -p "$prompt" ans </dev/tty; then
+                ans=$default
+                echo
+            else
+                # Turn off timeout if answer entered.
+                timeout=0
+                if [[ ! "$ans" ]]; then ans=$default; fi
+            fi
+        else
+            read -p "$prompt" ans </dev/tty
+            if [[ ! "$ans" ]]; then
+                if [ $required -eq 1 ]; then
+                    warn "An answer is required."
+                    ans=""
+                else
+                    ans=$default
+                fi
+            elif [ $required -eq 0 ]; then
+                ans=$(tr '[:upper:]' '[:lower:]' <<< $ans)
+                if [ "$ans" = "yes" ]; then
+                    ans="y"
+                elif [ "$ans" = "no" ]; then
+                    ans="n"
+                fi
+            fi 
+        fi
+
+        if [ $required -eq 0 ]; then
+            if [ "$ans" != 'y' -a "$ans" != 'n' ]; then
+                warn "Invalid answer. Please use y or n."
+                ans=""
+            fi
+        fi
+    done
+
+    if [ $required -eq 1 ]; then
+        echo $ans
+        return 0
+    fi
+
+    [[ "$ans" = "y" || "$ans" == "yes" ]]
+}
+
+
+################################################################################
+#                                                                              #
+#    Main program                                                              #
+#                                                                              #
+################################################################################
+
+if [ $# -lt 1 ]; then
+    # TODO: Needs a help subsystem.
+    echo "No command provided"
+    exit 0
+fi
+
+# Start a new blank line before any output if not in batch mode.
+if [ "$1" == "-b" -o "$1" == "-q" ]; then
+    batch=1
+    shift
+else
+    echo
+fi
+
+# Process arguments
+# TODO: Full automatic argument processing before loading a script.
+golem_script=`_shell_resolve_cmd "$@"`
+if [ -z "$golem_script" ]; then
+    echo "Error: I don't understand \"$@\""
+    exit 0
+fi
+
+. "$golem_script"
+
+if [ $batch -eq 0 ]; then
+    echo
+fi
