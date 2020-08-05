@@ -8,7 +8,8 @@
 ################################################################################
 
 # Name of this script.
-scriptname=`basename $_`
+# shellcheck disable=SC2034
+scriptname=$(basename "$_")
 # And the path.
 scriptpath=$(readlink -m "$0")
 scriptdir=$(dirname "$scriptpath")
@@ -22,9 +23,6 @@ set -o pipefail
 
 # restrict newly created files to read/write by this user only.
 umask 077
-
-# Debug mode? 0 for no, anything else for yes.
-debug=0
 
 # Batch (quiet) mode?
 batch=0
@@ -42,7 +40,6 @@ batch=0
 # command entered by the user, starting with the most complex filenames first.
 # 
 _shell_resolve_cmd () {
-    local golem_cmd=""
     # The correct way to do this is to redirect the output from this
     # nasty series of commands as a redirect into `done`, e.g.:
     #     done < <(....)
@@ -51,17 +48,13 @@ _shell_resolve_cmd () {
     # which prevents later code from accessing any variables that are set,
     # exit doesn't work because the pipe is a subshell (it just exits the
     # pipe). So ... early return from a function!
-    for cmdfile in `ls "$scriptdir/scripts"`; do strlen=`expr length $cmdfile`; echo $strlen $cmdfile; done | sort -rn | cut -d " " -f 2 | while read filename; do
-        if [ "$filename" != "common.sh" ]; then
-            # Turn the filename into a regular expression...
-            # (needs moar backslashes, sigh.)
-            regex=`echo "$filename" | sed "s/\(.*\).sh/^\1/g" | sed 's/_/[[:space:]]\\\\{1,\\\\}.*[[:space:]]*/g'`
-            # ...and then try to match it against the entered command.
-            matched=`echo "$@" | grep $regex`
-            if [ -n "$matched" ]; then
-                echo "$scriptdir/scripts/$filename"
-                return 0
-            fi
+    for cmdfile in "$scriptdir"/scripts/*; do echo ${#cmdfile} "$cmdfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+        # Convert the filename into a regular expression...
+        regex=$(basename "$filename" | sed 's/\(\.sh\|\.py\)\?$//' | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
+        # ...and then try to match it against the entered command.
+        if echo "$*" | grep -q "^$regex"; then
+            echo "$filename"
+            return 0
         fi
     done
     echo ""
@@ -73,7 +66,7 @@ _shell_resolve_cmd () {
 # _warn(): write a message to stderr.
 # 
 warn () {
-    echo "$@" >&2
+    echo "$*" >&2
 }
 
 
@@ -92,7 +85,6 @@ ask () {
     # ask() gives the answer in its exit status, e.g.,
     # if ask "Continue?"; then ...
     local ans=""
-    local waiting=1
     local timeout=0
     local required=0
     local default=""
@@ -105,12 +97,12 @@ ask () {
                 shift
                 default=$1
                 if [[ ! "$default" ]]; then warn "Missing default value"; fi
-                default=$(tr '[:upper:]' '[:lower:]' <<< $default)
+                default=$(tr '[:upper:]' '[:lower:]' <<< "$default")
                 if [[ "$default" = "yes" ]]; then
                     default="y"
                 elif [[ "$default" = "no" ]]; then
                     default="n"
-                elif [ "$default" != "y" -a "$default" != "n" ]; then
+                elif [ "$default" != "y" ] && [ "$default" != "n" ]; then
                     warn "Illegal default answer: $default"
                 fi
                 shift
@@ -149,7 +141,7 @@ ask () {
         exit 1
     fi
     if [ $required -ne 0 ]; then
-        if [ -n "$default" -o $timeout -gt 0 ]; then
+        if [ -n "$default" ] || [ "$timeout" -gt 0 ]; then
             warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
             exit 1
         fi
@@ -174,7 +166,7 @@ ask () {
     while [ -z "$ans" ]
     do
         if [[ $timeout -ne 0 ]]; then
-            if ! read -t $timeout -p "$prompt" ans </dev/tty; then
+            if ! read -r -t "$timeout" -p "$prompt" ans </dev/tty; then
                 ans=$default
                 echo
             else
@@ -183,7 +175,7 @@ ask () {
                 if [[ ! "$ans" ]]; then ans=$default; fi
             fi
         else
-            read -p "$prompt" ans </dev/tty
+            read -r -p "$prompt" ans </dev/tty
             if [[ ! "$ans" ]]; then
                 if [ $required -eq 1 ]; then
                     warn "An answer is required."
@@ -202,7 +194,7 @@ ask () {
         fi
 
         if [ $required -eq 0 ]; then
-            if [ "$ans" != 'y' -a "$ans" != 'n' ]; then
+            if [ "$ans" != 'y' ] && [ "$ans" != 'n' ]; then
                 warn "Invalid answer. Please use y or n."
                 ans=""
             fi
@@ -231,7 +223,7 @@ if [ $# -lt 1 ]; then
 fi
 
 # Start a new blank line before any output if not in batch mode.
-if [ "$1" == "-b" -o "$1" == "-q" ]; then
+if [ "$1" == "-b" ] || [ "$1" == "-q" ]; then
     batch=1
     shift
 else
@@ -240,9 +232,9 @@ fi
 
 # Process arguments
 # TODO: Full automatic argument processing before loading a script.
-golem_script=`_shell_resolve_cmd "$@"`
+golem_script=$(_shell_resolve_cmd "$*")
 if [ -z "$golem_script" ]; then
-    echo "Error: I don't understand \"$@\""
+    echo "Error: I don't understand \"$*\""
     exit 1
 fi
 
@@ -253,6 +245,7 @@ if grep -q '^[[:space:]]*sudo ' "$golem_script"; then
     fi
 fi
 
+# shellcheck disable=SC1090
 . "$golem_script"
 
 if [ $batch -eq 0 ]; then
