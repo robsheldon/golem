@@ -68,7 +68,7 @@ random_string () {
     else
         local num_chars=$((12 + RANDOM % 12))
     fi
-    base64 /dev/urandom | tr -d '/+oO0lLiI1\n\r' | head -c $num_chars
+    tr -dc _A-Z-a-z-0-9 < /dev/urandom | tr -d '/+oO0lLiI1\n\r' | head -c $num_chars
 }
 
 
