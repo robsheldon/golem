@@ -62,6 +62,16 @@ _shell_resolve_cmd () {
 }
 
 
+random_string () {
+    if [ $# -gt 0 ]; then
+        local num_chars=$1
+    else
+        local num_chars=$((12 + RANDOM % 12))
+    fi
+    base64 /dev/urandom | tr -d '/+oO0lLiI1\n\r' | head -c $num_chars
+}
+
+
 ##
 # _warn(): write a message to stderr.
 # 
