@@ -62,6 +62,13 @@ _shell_resolve_cmd () {
 }
 
 
+##
+# random_string(): generate a pseudorandom string.
+#     Accepts an argument for the length of the string; if no string length
+#     is provided, then it defaults to generating a string between 12 and
+#     25 characters long.
+#     Similar-looking characters are filtered out of the result string.
+#
 random_string () {
     if [ $# -gt 0 ]; then
         local num_chars=$1
@@ -73,17 +80,26 @@ random_string () {
 
 
 ##
-# _warn(): write a message to stderr.
-# 
+# warn(): write a message to stderr.
+#
 warn () {
     echo "$*" >&2
 }
 
 
 ##
+# fail(): write a message to stderr and exit immediately with a non-zero code.
+#
+fail () {
+    echo "$*" > &2
+    exit 1
+}
+
+
+##
 # ask(): ask the user a question and process the response, handling defaults,
 # timeouts, and other options automatically.
-# 
+#
 ask () {
     # Options:
     #     --timeout N:     time out if there's no input for N seconds.
