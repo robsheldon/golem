@@ -215,11 +215,11 @@ path_extension () {
 
 
 ##
-# random_string(): generate a pseudorandom string.
-#     Accepts an argument for the length of the string; if no string length
-#     is provided, then it defaults to generating a string between 12 and
-#     25 characters long.
-#     Similar-looking characters are filtered out of the result string.
+# Generate a pseudorandom string. Accepts an argument for the length of the
+# string; if no string length is provided, then it defaults to generating a
+# string between 12 and 25 characters long.
+#
+# Similar-looking characters are filtered out of the result string.
 #
 random_string () {
     if [ $# -gt 0 ]; then
@@ -232,7 +232,7 @@ random_string () {
 
 
 ##
-# warn(): write a message to stderr.
+# Write a message to stderr and continue execution.
 #
 warn () {
     echo "Warning: $*" >&2
@@ -240,7 +240,7 @@ warn () {
 
 
 ##
-# fail(): write a message to stderr and exit immediately with a non-zero code.
+# Write a message to stderr and exit immediately with a non-zero code.
 #
 fail () {
     echo "ERROR: $*" >&2
@@ -249,8 +249,8 @@ fail () {
 
 
 ##
-# ask(): ask the user a question and process the response, handling defaults,
-# timeouts, and other options automatically.
+# Ask the user a question and process the response, with options for defaults
+# and timeouts.
 #
 ask () {
     # Options:
