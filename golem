@@ -13,6 +13,8 @@ scriptname=$(basename "$_")
 # And the path.
 scriptpath=$(readlink -m "$0")
 scriptdir=$(dirname "$scriptpath")
+# And the PID.
+golem_pid=$$
 
 # barf and exit if an undefined variable is referenced.
 set -u
@@ -27,6 +29,9 @@ umask 077
 # Batch (quiet) mode?
 batch=0
 
+# Halt if a TERM signal is received by this PID.
+trap "exit 1" TERM
+
 
 
 ################################################################################
@@ -36,29 +41,176 @@ batch=0
 ################################################################################
 
 ##
-# _shell_resolve_cmd(): search for any golem scripts whose name matches the
-# command entered by the user, starting with the most complex filenames first.
+# Return the path to the script file from either the cache or the script source
+# directory whose name best matches the command the user wants to run.
 # 
-_shell_resolve_cmd () {
-    # The correct way to do this is to redirect the output from this
-    # nasty series of commands as a redirect into `done`, e.g.:
-    #     done < <(....)
-    # But older verions of Bash vomit when you try that. Piping doesn't
-    # work nicely on newer versions of Bash because it creates a subshell
-    # which prevents later code from accessing any variables that are set,
-    # exit doesn't work because the pipe is a subshell (it just exits the
-    # pipe). So ... early return from a function!
-    for cmdfile in "$scriptdir"/scripts/*; do echo ${#cmdfile} "$cmdfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
-        # Convert the filename into a regular expression...
-        regex=$(basename "$filename" | sed 's/\(\.sh\|\.py\)\?$//' | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
-        # ...and then try to match it against the entered command.
-        if echo "$*" | grep -q "^$regex"; then
-            echo "$filename"
-            return 0
-        fi
+_find_cmd_file () {
+    # Make sure the local "scripts" and ".cache" directories are present.
+    mkdir -p "$scriptdir"/scripts
+    mkdir -p "$scriptdir"/.cache
+    for lookdir in ".cache" "scripts"; do
+        # Iterate over the list of files in this directory from longest file
+        # name to shortest.
+        # The correct way to do this is to redirect the output from this nasty
+        # series of commands as a redirect into `done`, e.g.:
+        #     done < <(....)
+        # But older verions of Bash vomit when you try that. Piping doesn't
+        # work nicely on newer versions of Bash because it creates a subshell
+        # which prevents later code from accessing any variables that are set,
+        # exit doesn't work because the pipe is a subshell (it just exits the
+        # pipe). So ... early return from a function!
+        for scriptfile in "$scriptdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+            # Convert the filename into a regular expression...
+            regex=$(path_basename "$filename" | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
+            # ...and then try to match it against the entered command.
+            if echo "$*" | grep -q "^$regex"; then
+                echo "$filename"
+                return 0
+            fi
+        done
     done
     echo ""
     return 1
+}
+
+
+##
+# Verify the integrity of the script cache: ensures the source file still exists,
+# there's only one matching source file for the cache entry, and the timestamps
+# still match. If any of these aren't true, then the cache gets updated or an
+# error message is displayed and the command fails.
+#
+_cache_check () {
+    file_basename="$1"
+    # Locate matching source and cache file(s).
+    sourcefiles=("$scriptdir"/scripts/"$file_basename".*)
+    cachedfiles=("$scriptdir"/.cache/"$file_basename".*)
+    # See if a cache update can be skipped.
+    # The current version of bash should return a single-element array containing
+    # the input glob if no matches were found, but future versions may change
+    # this behavior.
+    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$scriptdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$scriptdir/scripts/$file_basename.*" ]; then
+        # Found one match of each, timestamps can be compared.
+        cached_ts=$(date -r "${cachedfiles[0]}" '+%s')
+        source_ts=$(date -r "${sourcefiles[0]}" '+%s')
+        if [ "$cached_ts" = "$source_ts" ]; then
+            # All checks passed, no update needed.
+            echo "${cachedfiles[0]}"
+            return 0
+        fi
+    fi
+    # One of the above tests failed, so the cache needs to be updated.
+    if [ ${#sourcefiles[@]} -gt 1 ]; then
+        fail "There are multiple files in the $scriptdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
+    fi
+    # Delete any copies of this file currently in the cache.
+    find -P "$scriptdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
+    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
+        # The original source file has disappeared. In this case, there's nothing
+        # more for the _cache_update() function to do. If this is an error
+        # condition, it will be handled elsewhere.
+        echo ""
+        return 0
+    fi
+    sourcefile="${sourcefiles[0]}"
+    # What happens next depends on the file extension for the source file.
+    sourcetype=$(path_extension "$sourcefile")
+    cachedfile=""
+    case "$sourcetype" in
+        .sh)
+            shellcheck=$(command -v shellcheck)
+            if [ -n "$shellcheck" ]; then
+                # Run shellcheck on the source file before using it, if available.
+                if ! $shellcheck "$sourcefile" >/dev/null 2>&1; then
+                    fail "The shell file in $sourcefile has changed and the new version isn't passing shellcheck. Please run \"shellcheck $sourcefile\" and then try again."
+                fi
+            fi
+            # Shellcheck succeeded or is not available, load this file into the cache.
+            cachedfile="$scriptdir/.cache/$file_basename.sh"
+            cp "$sourcefile" "$cachedfile"
+        ;;
+    esac
+    if [ -n "$cachedfile" ]; then
+        touch -r "$sourcefile" "$cachedfile"
+    fi
+    echo "$cachedfile"
+    return 0
+}
+
+
+##
+# Translate a given command string into a matching script to be run.
+#
+_shell_resolve_cmd () {
+    command_string="$*"
+    for i in $(seq 1 5); do
+        matchfile=$(_find_cmd_file "$command_string")
+        if [ -z "$matchfile" ]; then
+            # Nothing found in either the scripts/ directory or the cache. The
+            # caller will handle this with an error message.
+            echo ""
+            return 1
+        fi
+        matchcmd=$(path_basename "$matchfile")
+        cachefile=$(_cache_check "$matchcmd")
+        if [ -z "$cachefile" ]; then
+            # The cached file didn't survive inspection, so try finding another
+            # matching command script.
+            continue
+        fi
+        echo "$cachefile"
+        [ -n "$cachefile" ]
+        return $?
+    done
+    # This should never happen.
+    fail "No matching script could be found for this command after 5 tries."
+}
+
+
+##
+# Return the filename component of a path; this is identical to calling
+# "basename [path]"
+#
+path_filename () {
+    path=$(realpath -s -m "$1")
+    echo "${path##*/}"
+}
+
+
+##
+# Return the parent directory of a path; this is identical to calling
+# "dirname [path]", but it also cleans up extra slashes in the path.
+#
+path_directory () {
+    filename=$(path_filename "$1")
+    realpath -s -m "${1%$filename}"
+}
+
+
+##
+# Return the basename of the filename component of a path. For example, return
+# "my_file" from "/path/to/my_file.txt".
+#
+path_basename () {
+    filename=$(path_filename "$1")
+    base="${filename%%.[^.]*}"
+    ext="${filename:${#base} + 1}"
+    if [ -z "$base" ] && [ -n "$ext" ]; then
+        echo ".$ext"
+    else
+        echo "$base"
+    fi
+}
+
+
+##
+# Return the extension (suffix) of the filename component of a path. Example:
+# return ".tar.gz" for "my_file.tar.gz", and "" for ".test".
+#
+path_extension () {
+    filename=$(path_filename "$1")
+    basename=$(path_basename "$filename")
+    echo "${filename##$basename}"
 }
 
 
@@ -83,7 +235,7 @@ random_string () {
 # warn(): write a message to stderr.
 #
 warn () {
-    echo "$*" >&2
+    echo "Warning: $*" >&2
 }
 
 
@@ -91,8 +243,8 @@ warn () {
 # fail(): write a message to stderr and exit immediately with a non-zero code.
 #
 fail () {
-    echo "$*" > &2
-    exit 1
+    echo "ERROR: $*" >&2
+    kill -s TERM $golem_pid
 }
 
 
@@ -244,8 +396,7 @@ ask () {
 
 if [ $# -lt 1 ]; then
     # TODO: Needs a help subsystem.
-    echo "No command provided"
-    exit 1
+    fail "No command provided"
 fi
 
 # Start a new blank line before any output if not in batch mode.
@@ -258,21 +409,17 @@ fi
 
 # Process arguments
 # TODO: Full automatic argument processing before loading a script.
-golem_script=$(_shell_resolve_cmd "$*")
-if [ -z "$golem_script" ]; then
-    echo "Error: I don't understand \"$*\""
-    exit 1
+command_script=$(_shell_resolve_cmd "$*")
+if [ -z "$command_script" ]; then
+    fail "No matching command script found for \"$*\""
 fi
 
-if grep -q '^[[:space:]]*sudo ' "$golem_script"; then
-    if ! groups | grep -qw 'sudo'; then
-        echo "It looks like this command requires superuser access and you're not in the 'sudo' group"
-        exit 1
-    fi
+if grep -q '^[[:space:]]*sudo ' "$command_script" && ! groups | grep -qw 'sudo'; then
+    fail "It looks like this command requires superuser access and you're not in the 'sudo' group"
 fi
 
 # shellcheck disable=SC1090
-. "$golem_script"
+. "$command_script"
 
 if [ $batch -eq 0 ]; then
     echo
