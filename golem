@@ -505,10 +505,7 @@ if grep -q '^[[:space:]]*sudo ' "$command_script" && ! groups | grep -qw 'sudo';
     fail "It looks like this command requires superuser access and you're not in the 'sudo' group"
 fi
 
-echo "SUCCESS!"
-exit 0
-
-# /bin/bash "$command_script" "$*"
+/bin/bash "$command_script" "$*"
 
 if [ $batch -eq 0 ]; then
     echo
