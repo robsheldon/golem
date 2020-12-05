@@ -141,7 +141,11 @@ _cache_check () {
             # We really want to avoid getting a half-broken shell script in
             # the cache directory, so a temporary file is used here.
             tempfile=$(mktemp /tmp/golem.XXXXXX)
-            if ! $mdsh --compile "$sourcefile" >"$tempfile" 2>&1; then
+            # The next line constructs a special mdsh function to handle "bash"
+            # language blocks; it natively only handles "shell" language blocks.
+            # That function gets injected into the top of the input and then
+            # passed to mdsh.
+            if ! echo -e '```shell @mdsh\nmdsh-compile-bash() { printf "%s" "$1"; }\n```\n\n' | cat - "$sourcefile" | $mdsh --compile - >"$tempfile" 2>&1; then
                 rm "$tempfile"
                 fail "mdsh was unable to parse this file: \"$sourcefile\""
             fi
