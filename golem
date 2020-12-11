@@ -7,13 +7,6 @@
 #                                                                              #
 ################################################################################
 
-# Name of this script.
-# shellcheck disable=SC2034
-scriptname=$(basename "$_")
-# And the path.
-scriptpath=$(readlink -m "$0")
-scriptdir=$(dirname "$scriptpath")
-
 # restrict newly created files to read/write by this user only.
 umask 077
 
@@ -33,8 +26,8 @@ batch=0
 # 
 _find_cmd_file () {
     # Make sure the local "scripts" and ".cache" directories are present.
-    mkdir -p "$scriptdir"/scripts
-    mkdir -p "$scriptdir"/.cache
+    mkdir -p "$golemdir"/scripts
+    mkdir -p "$golemdir"/.cache
     for lookdir in ".cache" "scripts"; do
         # Iterate over the list of files in this directory from longest file
         # name to shortest.
@@ -46,7 +39,7 @@ _find_cmd_file () {
         # which prevents later code from accessing any variables that are set,
         # exit doesn't work because the pipe is a subshell (it just exits the
         # pipe). So ... early return from a function!
-        for scriptfile in "$scriptdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+        for scriptfile in "$golemdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
             # Convert the filename into a regular expression...
             regex=$(path_basename "$filename" | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
             # ...and then try to match it against the entered command.
@@ -70,13 +63,13 @@ _find_cmd_file () {
 _cache_check () {
     file_basename="$1"
     # Locate matching source and cache file(s).
-    sourcefiles=("$scriptdir"/scripts/"$file_basename".*)
-    cachedfiles=("$scriptdir"/.cache/"$file_basename".*)
+    sourcefiles=("$golemdir"/scripts/"$file_basename".*)
+    cachedfiles=("$golemdir"/.cache/"$file_basename".*)
     # See if a cache update can be skipped.
     # The current version of bash should return a single-element array containing
     # the input glob if no matches were found, but future versions may change
     # this behavior.
-    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$scriptdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$scriptdir/scripts/$file_basename.*" ]; then
+    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$golemdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$golemdir/scripts/$file_basename.*" ]; then
         # Found one match of each, timestamps can be compared.
         cached_ts=$(date -r "${cachedfiles[0]}" '+%s')
         source_ts=$(date -r "${sourcefiles[0]}" '+%s')
@@ -88,11 +81,11 @@ _cache_check () {
     fi
     # One of the above tests failed, so the cache needs to be updated.
     if [ ${#sourcefiles[@]} -gt 1 ]; then
-        fail "There are multiple files in the $scriptdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
+        fail "There are multiple files in the $golemdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
     fi
     # Delete any copies of this file currently in the cache.
-    find -P "$scriptdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
-    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
+    find -P "$golemdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
+    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$golemdir/scripts/$file_basename.*" ]; then
         # The original source file has disappeared. In this case, there's nothing
         # more for the _cache_update() function to do. If this is an error
         # condition, it will be handled elsewhere.
@@ -114,11 +107,11 @@ _cache_check () {
                 fi
             fi
             # Shellcheck succeeded or is not available.
-            cachedfile="$scriptdir/.cache/$file_basename.sh"
+            cachedfile="$golemdir/.cache/$file_basename.sh"
             # Inject the golem public code into this shell script.
             # See https://unix.stackexchange.com/a/193498 for an explanation of
             # this line noise.
-            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n" | sed '/^\s*[^#]\+/{;r /dev/stdin
+            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$golempath" | xargs -0 printf "\\n$warning\\n%s\\n" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$sourcefile" <(printf \\n) >"$cachedfile"
             if [ -n "$shellcheck" ]; then
                 # Run shellcheck one more time on the completed cached file.
@@ -145,7 +138,7 @@ _cache_check () {
             # language blocks; it natively only handles "shell" language blocks.
             # That function gets injected into the top of the input and then
             # passed to mdsh.
-            if ! echo -e '```shell @mdsh\nmdsh-compile-bash() { printf "%s" "$1"; }\n```\n\n' | cat - "$sourcefile" | $mdsh --compile - >"$tempfile" 2>&1; then
+            if ! echo -e '```shell @mdsh\nmdsh-compile-bash(){ printf "%s" "$1";}\n```\n\n' | cat - "$sourcefile" | $mdsh --compile - >"$tempfile" 2>&1; then
                 rm "$tempfile"
                 fail "mdsh was unable to parse this file: \"$sourcefile\""
             fi
@@ -172,8 +165,8 @@ _cache_check () {
                 fail "The file converted by mdsh did not pass shellcheck. You can review the compiled file at \"$tempfile\"."
             fi
             # Use the sed line noise to generate the file in the cache.
-            cachedfile="$scriptdir/.cache/$file_basename.sh"
-            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n" | sed '/^\s*[^#]\+/{;r /dev/stdin
+            cachedfile="$golemdir/.cache/$file_basename.sh"
+            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$golempath" | xargs -0 printf "\\n$warning\\n%s\\n" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$tempfile" <(printf \\n) >"$cachedfile"
             if ! $shellcheck "$cachedfile" >/dev/null 2>&1; then
                 mv "$cachedfile" "$tempfile"
@@ -187,7 +180,7 @@ _cache_check () {
             # All other file types: just copy the file into the cache and hope
             # the user knows what they're doing.
             filename=$(path_filename "$sourcefile")
-            cachedfile="$scriptdir/.cache/$filename"
+            cachedfile="$golemdir/.cache/$filename"
             cp "$sourcefile" "$cachedfile"
         ;;
     esac
@@ -205,7 +198,9 @@ _cache_check () {
 #
 _shell_resolve_cmd () {
     command_string="$*"
-    for i in $(seq 1 5); do
+    i=5
+    while [ $i -gt 0 ]; do
+        i=$((i-1))
         matchfile=$(_find_cmd_file "$command_string")
         if [ -z "$matchfile" ]; then
             # Nothing found in either the scripts/ directory or the cache. The
@@ -214,7 +209,7 @@ _shell_resolve_cmd () {
             return 1
         fi
         matchcmd=$(path_basename "$matchfile")
-        cachefile=$(_cache_check "$matchcmd")
+        cachefile=$(_cache_check "$matchcmd") || exit 1
         if [ -z "$cachefile" ]; then
             # The cached file didn't survive inspection, so try finding another
             # matching command script.
@@ -239,16 +234,19 @@ _shell_resolve_cmd () {
 
 # begin-golem-injected-code
 
+# Name of this script.
+# shellcheck disable=SC2034
+golemname=$(basename "$_")
+# And the path.
+golempath=$(readlink -m "$0")
+golemdir=$(dirname "$golempath")
+
 # Exit with an error if an undefined variable is referenced.
 set -u
 
 # If any command in a pipeline fails, that return code will be used as the
 # return code for the whole pipeline.
 set -o pipefail
-
-# Store the script's PID; this is used in the fail() function to terminate
-# the script from subshells, loops, and the like.
-scriptpid=$$
 
 # Halt with a non-zero exit status if a TERM signal is received by this PID.
 # This is used by the fail() function along with $scriptpid.
@@ -337,7 +335,8 @@ warn () {
 #
 fail () {
     echo "ERROR: $*" >&2
-    kill -s TERM $scriptpid
+    pkill -TERM -g $$ "$golemname" || kill TERM $$
+    exit 1
 }
 
 
