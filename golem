@@ -26,8 +26,8 @@ batch=0
 # 
 _find_cmd_file () {
     # Make sure the local "scripts" and ".cache" directories are present.
-    mkdir -p "$golemdir"/scripts
-    mkdir -p "$golemdir"/.cache
+    mkdir -p "$scriptdir"/scripts
+    mkdir -p "$scriptdir"/.cache
     for lookdir in ".cache" "scripts"; do
         # Iterate over the list of files in this directory from longest file
         # name to shortest.
@@ -39,7 +39,7 @@ _find_cmd_file () {
         # which prevents later code from accessing any variables that are set,
         # exit doesn't work because the pipe is a subshell (it just exits the
         # pipe). So ... early return from a function!
-        for scriptfile in "$golemdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+        for scriptfile in "$scriptdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
             # Convert the filename into a regular expression...
             regex=$(path_basename "$filename" | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
             # ...and then try to match it against the entered command.
@@ -63,13 +63,13 @@ _find_cmd_file () {
 _cache_check () {
     file_basename="$1"
     # Locate matching source and cache file(s).
-    sourcefiles=("$golemdir"/scripts/"$file_basename".*)
-    cachedfiles=("$golemdir"/.cache/"$file_basename".*)
+    sourcefiles=("$scriptdir"/scripts/"$file_basename".*)
+    cachedfiles=("$scriptdir"/.cache/"$file_basename".*)
     # See if a cache update can be skipped.
     # The current version of bash should return a single-element array containing
     # the input glob if no matches were found, but future versions may change
     # this behavior.
-    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$golemdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$golemdir/scripts/$file_basename.*" ]; then
+    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$scriptdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$scriptdir/scripts/$file_basename.*" ]; then
         # Found one match of each, timestamps can be compared.
         cached_ts=$(date -r "${cachedfiles[0]}" '+%s')
         source_ts=$(date -r "${sourcefiles[0]}" '+%s')
@@ -81,11 +81,11 @@ _cache_check () {
     fi
     # One of the above tests failed, so the cache needs to be updated.
     if [ ${#sourcefiles[@]} -gt 1 ]; then
-        fail "There are multiple files in the $golemdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
+        fail "There are multiple files in the $scriptdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
     fi
     # Delete any copies of this file currently in the cache.
-    find -P "$golemdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
-    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$golemdir/scripts/$file_basename.*" ]; then
+    find -P "$scriptdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
+    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
         # The original source file has disappeared. In this case, there's nothing
         # more for the _cache_update() function to do. If this is an error
         # condition, it will be handled elsewhere.
@@ -108,7 +108,7 @@ _cache_check () {
                 fi
             fi
             # Shellcheck succeeded or is not available.
-            cachedfile="$golemdir/.cache/$file_basename.sh"
+            cachedfile="$scriptdir/.cache/$file_basename.sh"
             # Nuke the 'sudo warmup' if it's not needed for this script.
             if ! grep -q '^[[:space:]]*sudo ' "$sourcefile"; then
                 sudowarmup=""
@@ -116,7 +116,7 @@ _cache_check () {
             # Inject the golem public code into this shell script.
             # See https://unix.stackexchange.com/a/193498 for an explanation of
             # this line noise.
-            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$golempath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
+            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$sourcefile" <(printf \\n) >"$cachedfile"
             if [ -n "$shellcheck" ]; then
                 # Run shellcheck one more time on the completed cached file.
@@ -174,8 +174,8 @@ _cache_check () {
                 sudowarmup=""
             fi
             # Use the sed line noise to generate the file in the cache.
-            cachedfile="$golemdir/.cache/$file_basename.sh"
-            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$golempath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
+            cachedfile="$scriptdir/.cache/$file_basename.sh"
+            sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$tempfile" <(printf \\n) >"$cachedfile"
             if ! $shellcheck "$cachedfile" >/dev/null 2>&1; then
                 mv "$cachedfile" "$tempfile"
@@ -189,7 +189,7 @@ _cache_check () {
             # All other file types: just copy the file into the cache and hope
             # the user knows what they're doing.
             filename=$(path_filename "$sourcefile")
-            cachedfile="$golemdir/.cache/$filename"
+            cachedfile="$scriptdir/.cache/$filename"
             cp "$sourcefile" "$cachedfile"
         ;;
     esac
@@ -243,12 +243,15 @@ _shell_resolve_cmd () {
 
 # begin-golem-injected-code
 
-# Name of this script.
+# Use any of these as necessary.
 # shellcheck disable=SC2034
-golemname=$(basename "$_")
-# And the path.
-golempath=$(readlink -m "$0")
-golemdir=$(dirname "$golempath")
+scriptname=$(basename "$_")
+# shellcheck disable=SC2034
+scriptpath=$(readlink -m "$0")
+# shellcheck disable=SC2034
+scriptdir=$(dirname "$scriptpath")
+# shellcheck disable=SC2034
+scriptshell=$(readlink /proc/$$/exe)
 
 # Exit with an error if an undefined variable is referenced.
 set -u
@@ -344,7 +347,7 @@ warn () {
 #
 fail () {
     echo "ERROR: $*" >&2
-    pkill -TERM -g $$ "$golemname" || kill TERM $$
+    pkill -TERM -g $$ "$scriptname" || kill TERM $$
     exit 1
 }
 
@@ -506,14 +509,37 @@ else
     echo
 fi
 
+# Check the environment.
+# A "scripts" directory should be present in the parent directory.
+# This doesn't get automatically fixed because it's indicative of something
+# unusual about the environment.
+if [ ! -d "$scriptdir/scripts" ]; then
+    fail "The \"scripts\" directory is missing from \"$scriptdir\". It should have been included in the repository. Please create it manually."
+fi
+# The import_script.sh file should be present in scripts/.
+if [ ! -f "$scriptdir/scripts/import_script.sh" ]; then
+    fail "\"$scriptdir/scripts/import_script.sh\" is missing. It is required for script management. You can find a current copy at https://github.com/robsheldon/golem/"
+fi
+# The import_script.sh file should be executable.
+if [ ! -x "$scriptdir/scripts/import_script.sh" ]; then
+    fail "\"$scriptdir/scripts/import_script.sh\" is not executable. Please chmod it. You can find a current copy at https://github.com/robsheldon/golem/"
+fi
+# The .cache directory should exist because import_script.sh uses it to sanity-
+# check the environment. This can be created if it's not present.
+if [ ! -d "$scriptdir/.cache" ]; then
+    if ! mkdir -p "$scriptdir/.cache"; then
+        fail "\"$scriptdir/.cache doesn't exist and could not be created. Please create it manually and try again."
+    fi
+fi
+
 # Process arguments
 # TODO: Full automatic argument processing before loading a script.
 command_script=$(_shell_resolve_cmd "$*")
 if [ -z "$command_script" ]; then
     fail "No matching command script found for \"$*\""
 fi
-exit 0
-/bin/bash "$command_script" "$*"
+
+$scriptshell "$command_script" "$*"
 
 if [ $batch -eq 0 ]; then
     echo
