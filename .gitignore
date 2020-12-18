@@ -1,2 +1,3 @@
 scripts/*
-!scripts/.keep
+!scripts/import_script.sh
+.cache/*
