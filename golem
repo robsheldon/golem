@@ -232,7 +232,7 @@ warn () {
 #
 fail () {
     echo "ERROR: $*" | fmt -w 80 >&2
-    pkill -TERM -g $$ "$scriptname" || kill TERM $$
+    pkill -TERM -g $$ "$scriptname" || kill TERM $$ >/dev/null 2>&1
     exit 1
 }
 
