@@ -373,13 +373,42 @@ ask () {
     [[ "$ans" = "y" || "$ans" == "yes" ]]
 }
 
-# end-golem-injected-code
+# Process arguments. Golem will load any "--variable value" pairs into the
+# command script's runtime. Example: if your command script needs a "hostname"
+# value, the user can supply that with, "golem --hostname 'host.name' your command",
+# and the "your_command.sh" file will have a variable named "hostname" with the
+# value "host.name".
+declare -a longopts=()
+while [[ "$1" ]]; do
+    case "$1" in
+        --*)
+            varname="${1:2}"
+            shift
+            if [[ ! "$1" ]]; then
+                fail "Missing value for --$varname"
+            fi
+            varvalue="$1"
+            shift
+            # This line creates the named variable in the current scope.
+            printf -v "$varname" '%s' "$varvalue"
+            # These longopts need to be saved because of the way golem invokes
+            # command scripts; otherwise, it has no way to pass the arguments
+            # off to the scripts.
+            longopts+=("$(printf '%s' "--$varname")")
+            longopts+=("$(printf '%s' "$varvalue")")
+            ;;
+        *)
+            break
+    esac
+done
 
 ################################################################################
 #                                                                              #
 #    Main program                                                              #
 #                                                                              #
 ################################################################################
+
+# end-golem-injected-code
 
 if [ $# -lt 1 ]; then
     # TODO: Needs a help subsystem.
@@ -426,20 +455,17 @@ if [[ "$*" == "import script"* ]]; then
     shift; shift
     cached=$(_import_script "$@") || exit 1
     if [ -f "$cached" ]; then
-        echo "Successfully imported $@"
+        echo "Successfully imported $*"
     else
         echo "Script failed to import but the import function didn't return an error. This is a bug."
         exit 1
     fi
 else
-    # Process arguments
-    # TODO: Full automatic argument processing before loading a script.
     command_script=$(_shell_resolve_cmd "$*")
     if [ -z "$command_script" ]; then
         fail "No matching command script found for \"$*\""
     fi
-
-    $scriptshell "$command_script" "$*"
+    $scriptshell "$command_script" "${longopts[@]}" "$*"
 fi
 
 if [ $batch -eq 0 ]; then
