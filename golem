@@ -379,7 +379,7 @@ ask () {
 # and the "your_command.sh" file will have a variable named "hostname" with the
 # value "host.name".
 declare -a longopts=()
-while [[ "$1" ]]; do
+while [ $# -gt 0 ] && [[ "$1" ]]; do
     case "$1" in
         --*)
             varname="${1:2}"
