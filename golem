@@ -254,8 +254,7 @@ ask () {
     local ans="" default="" prompt=""
     local -i timeout=0 required=0
 
-    while [[ "$1" ]]
-    do
+    while [ $# -gt 0 ] && [[ "$1" ]]; do
         case "$1" in
             -d|--default)
                 shift
@@ -373,6 +372,78 @@ ask () {
     [[ "$ans" = "y" || "$ans" == "yes" ]]
 }
 
+##
+# Require a named value from the user. If the value wasn't specified as a longopt
+# when the script was invoked, then need() will call ask() to request the value
+# from the user. Use this to get required values for your scripts.
+#
+need () {
+    # Usage:
+    #     varname=$(need varname -p "Prompt to the user" -m [regex])
+    local varname="" prompt="" match="" i="" found="" value=""
+    while [ $# -gt 0 ] && [[ "$1" ]]; do
+        case "$1" in
+            -p)
+                shift
+                if [ $# -gt 0 ]; then
+                    prompt="$1"
+                    shift
+                fi
+            ;;
+            -m)
+                shift
+                if [ $# -gt 0 ]; then
+                    match="$1"
+                    shift
+                fi
+            ;;
+            -*)
+                warn "Unrecognized option: $1"
+            ;;
+            *)
+                if [ -z "$varname" ]; then
+                    varname="$1"
+                    shift
+                else
+                    fail "need(): Unexpected value: $1"
+                fi
+            ;;
+        esac
+    done
+    if [ -z "$varname" ]; then
+        fail "need(): No varname was provided"
+    fi
+    if [ -z "$prompt" ]; then
+        prompt="$varname"
+    fi
+    # Now run through the longopts array and search for a "varname".
+    for i in "${longopts[@]}"; do
+        if [ -n "$found" ]; then
+            value="$i"
+            break
+        fi
+        if [ "$i" == "--$varname" ]; then
+            # Matched varname, set found here so that the next loop iteration
+            # picks up varname's value.
+            found="$varname"
+        fi
+    done
+    while true; do
+        if [ -n "$value" ]; then
+            if [ -z "$match" ] || [[ $value =~ $match ]]; then
+                break
+            else
+                warn "need(): this value doesn't match the expected regular expression: $match"
+            fi
+        fi
+        value=$(ask -r "$prompt")
+    done
+    # printf -v "$varname" '%s' "$value"
+    echo "$value"
+    return 0
+}
+
+
 # Process arguments. Golem will load any "--variable value" pairs into the
 # command script's runtime. Example: if your command script needs a "hostname"
 # value, the user can supply that with, "golem --hostname 'host.name' your command",
@@ -382,20 +453,15 @@ declare -a longopts=()
 while [ $# -gt 0 ] && [[ "$1" ]]; do
     case "$1" in
         --*)
-            varname="${1:2}"
-            shift
-            if [[ ! "$1" ]]; then
-                fail "Missing value for --$varname"
+            if [ $# -lt 2 ]; then
+                fail "Missing value for $1"
             fi
-            varvalue="$1"
-            shift
-            # This line creates the named variable in the current scope.
-            printf -v "$varname" '%s' "$varvalue"
             # These longopts need to be saved because of the way golem invokes
             # command scripts; otherwise, it has no way to pass the arguments
             # off to the scripts.
-            longopts+=("$(printf '%s' "--$varname")")
-            longopts+=("$(printf '%s' "$varvalue")")
+            longopts+=("$(printf '%s' "$1")")
+            longopts+=("$(printf '%s' "$2")")
+            shift 2
             ;;
         *)
             break
