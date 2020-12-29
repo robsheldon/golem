@@ -548,12 +548,7 @@ if [ $# -gt 2 ] && [ "$1" == "import" ] && [ "$2" == "script" ]; then
     . "$scriptdir"/scripts/import_script.sh
     # When invoked by the user, the "import script" words need to be shifted.
     shift; shift
-    cached=$(_import_script "$@") || exit 1
-    if [ -f "$cached" ]; then
-        echo "Successfully imported $*"
-    else
-        fail "Script failed to import but the import function didn't return an error. This is a bug."
-    fi
+    _import_script "$@"
 else
     command_script=$(_shell_resolve_cmd "$*")
     if [ -z "$command_script" ]; then

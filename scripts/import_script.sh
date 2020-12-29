@@ -27,11 +27,10 @@ _cache_update ()
         fail "There are multiple files in the $scriptdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
     fi
     if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
-        # The original source file has disappeared. In this case, there's nothing
-        # more for the _cache_update() function to do. If this is an error
-        # condition, it will be handled elsewhere.
-        echo ""
-        return 0
+        # TODO: It would be pretty cool if the .cache directory weren't already
+        # cleaned up at this point and a cached copy of this file could be
+        # retrieved if some disaster had befallen the hapless user.
+        fail "The original source file matching \"$file_basename\" has disappeared."
     fi
     sourcefile="${sourcefiles[0]}"
     # What happens next depends on the file extension for the source file.
@@ -165,8 +164,39 @@ _import_script () {
     fi
     if [ -z "$destcmd" ]; then
         # If no "as <command>" was provided, then this is an internal cache update.
-        _cache_update "$sourcefile"
+        cached=$(_cache_update "$sourcefile")
+        if [ -f "$cached" ]; then
+            echo "Successfully imported $sourcefile"
+        else
+            fail "$cached"
+        fi
     else
-        echo "$destcmd"
+        # Ensure the sourcefile exists.
+        if [ ! -f "$sourcefile" ]; then
+            fail "file does not exist: $sourcefile"
+        elif [ ! -r "$sourcefile" ]; then
+            fail "file exists but is not readable: $sourcefile" 
+        fi
+        destfile=$(echo "$destcmd" | sed 's/ \+/_/g')
+        matched=$(find -P "$scriptdir/scripts" -maxdepth 1 -name "$destfile.*")
+        if [ -n "$matched" ]; then
+            matched=$(path_filename "$matched")
+            if ! ask "\"$destcmd\" matches the file \"$matched\" in scripts/. Do you want to replace this file?"; then
+                echo "Canceled."
+                exit 1
+            else
+                rm "$scriptdir/scripts/$matched"
+            fi
+        fi
+        dest_ext=$(path_extension "$sourcefile")
+        if ! cp "$sourcefile" "$scriptdir/scripts/$destfile$dest_ext"; then
+            fail "Copy failed."
+        fi
+        cached=$(_cache_update "$destfile")
+        if [ -f "$cached" ]; then
+            echo "Successfully imported \"$destcmd\" as \"$destfile$dest_ext\""
+        else
+            fail "$cached"
+        fi
     fi
 }
