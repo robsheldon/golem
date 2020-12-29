@@ -541,7 +541,7 @@ if [ ! -d "$scriptdir/.cache" ]; then
     fi
 fi
 
-if [[ "$*" == "import script"* ]]; then
+if [ $# -gt 2 ] && [ "$1" == "import" ] && [ "$2" == "script" ]; then
     # Bootstrap a command script import. This bypasses the normal cache checks.
     # This is the only command script that is sourced instead of exec'd.
     # shellcheck source=scripts/import_script.sh
@@ -564,6 +564,12 @@ else
         $scriptshell "$command_script" "${longopts[@]}" "$*"
     else
         # One or more remote destinations.
+        # Start by converting the selected command script into a base64 blob.
+        # This is because several different common approaches to executing
+        # arbitrary shell scripts over ssh don't work well. After several hours
+        # of trial and error, I found a better answer at this under-appreciated
+        # comment on StackOverflow: https://unix.stackexchange.com/a/518960
+        scripthack=$(base64 "$command_script" | tr -d '\n')
         for destination in "${destinations[@]}"; do
             # The destination should be defined in the user's local ssh config file.
             ssh_host=$(ssh -G "$destination" | grep -Pio '(?<=^hostname ).*$')
@@ -575,13 +581,7 @@ else
                 fail "$destination could not be resolved to a valid network address"
             fi
             # Okay. Run this command script on a remote host.
-            # Doesn't work, because non-interactive:
-            # ssh -t "$destination" "bash -s -- ${longopts[*]} $*" < "$command_script" || fail "Could not establish an ssh connection to $destination"
-            # Doesn't work, arguments aren't passed correctly:
-            # ssh -t "$destination" "/bin/bash -s -- $(<"$command_script")" "${longopts[*]}" "$*" || fail "Could not establish an ssh connection to $destination"
-            # The answer came from this under-appreciated comment on StackOverflow:
-            # https://unix.stackexchange.com/a/518960
-            ssh -qt "$destination" /bin/bash "<(echo "$(cat "$command_script" | base64 | tr -d '\n')" | base64 --decode)" "${longopts[*]}" "$*"
+            ssh -qt "$destination" /bin/bash "<(echo \"$scripthack\" | base64 --decode)" "${longopts[*]}" "$*"
         done
     fi
 fi
