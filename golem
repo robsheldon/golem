@@ -422,7 +422,7 @@ need () {
             value="$i"
             break
         fi
-        if [ "$i" == "--$varname" ]; then
+        if [ "$i" = "--$varname" ]; then
             # Matched varname, set found here so that the next loop iteration
             # picks up varname's value.
             found="$varname"
@@ -511,7 +511,7 @@ if [ $# -lt 1 ]; then
 fi
 
 # Start a new blank line before any output if not in batch mode.
-if [ "$1" == "-b" ] || [ "$1" == "-q" ]; then
+if [ "$1" = "-b" ] || [ "$1" = "-q" ]; then
     batch=1
     shift
 else
@@ -541,7 +541,7 @@ if [ ! -d "$scriptdir/.cache" ]; then
     fi
 fi
 
-if [ $# -gt 2 ] && [ "$1" == "import" ] && [ "$2" == "script" ]; then
+if [ $# -gt 2 ] && [ "$1" = "import" ] && [ "$2" = "script" ]; then
     # Bootstrap a command script import. This bypasses the normal cache checks.
     # This is the only command script that is sourced instead of exec'd.
     # shellcheck source=scripts/import_script.sh
