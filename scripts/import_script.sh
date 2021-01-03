@@ -44,7 +44,7 @@ _cache_update ()
             if [ -n "$shellcheck" ]; then
                 # Run shellcheck on the source file before using it, if available.
                 if ! $shellcheck "$sourcefile" >/dev/null 2>&1; then
-                    fail "The shell file in $sourcefile has changed and the new version isn't passing shellcheck. Please run \"shellcheck $sourcefile\" and then try again."
+                    fail "The command script in $sourcefile isn't passing shellcheck. Please run \"shellcheck $sourcefile\", fix it, and then try again."
                 fi
             fi
             # Shellcheck succeeded or is not available.
