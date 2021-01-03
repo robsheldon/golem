@@ -11,7 +11,7 @@
 
 * an agent-less tool for literate devops, designed to work well with [mdsh](https://github.com/bashup/mdsh), so you can write executable documentation for your infrastructure.
 
-Golem is not intended to replace bigger, popular tools like Docker or Ansible, but it should be an attractive alternative for people who like documentation and shell scripts and have a handful of servers to look after.
+Golem is not intended to replace bigger, popular infrastructure management systems like Ansible, but it should be a useful tool for people who like documentation and shell scripts and have a handful of servers to look after.
 
 
 # An example
