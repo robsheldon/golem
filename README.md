@@ -181,7 +181,7 @@ When it generates a command script from some source file -- whether a shell scri
 * `set -u`, `pipefail`: these options are set for additional safety. `set -e` is not set here because there are some commands that need to be able to fail without killing the whole script (grep, for example).
 * `trap ... TERM`: the `TERM` signal is caught and used to invoke a simple `exit 1` command. This is used by another helper function, `fail()`, to try and terminate the current script in the event of an error.
 * `path_*` functions: `path_filename`, `path_directory`, `path_basename`, and `path_extension` provide canonical, battle-tested approaches to working with paths.
-* `random_string`: get an imperfect, but usable-in-a-pinch randomly-generated sequence that's appropriate for one-time passwords, keys, and some other secrets. This function strips out some characters that can cause confusion in some environments (like `lI1`).
+* `random_string`: get an imperfect, but usable-in-a-pinch randomly-generated sequence that's appropriate for temporary passwords, keys, and some other secrets. This function strips out some characters that can cause confusion in some environments (like `lI1`).
 * `warn`: write a message to STDERR.
 * `fail`: write a message to STDERR and try to halt the script. Halting scripts from nested subshells is very hard in bash. Golem makes a good effort here but the fact is that it's not as bulletproof as I'd like it to be. Try to avoid calling `fail` from subshells.
 * `ask`: this is a really, really nice function that allows your script to prompt the user for yes/no responses or more complicated requests. It includes support for default values, automatic timeouts, and required values, and is very easy to use.
