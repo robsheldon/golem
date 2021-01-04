@@ -1,5 +1,15 @@
-> The existence of a golem is sometimes a mixed blessing. Golems are not intelligent, and if commanded to perform a task, they will perform the instructions literally.
-<sup>[Wikipedia](https://en.wikipedia.org/wiki/Golem)</sup>
+<table border="0">
+  <tr>
+   <td border="0" width="700">
+    <p><img src="https://github.com/robsheldon/golem/raw/assets/golem_github.png"></p>
+    <p align="right"><sup>Graphics by Gabriel Kolbe. Visit Gabriel's <a href="https://www.deviantart.com/gabkt">DeviantArt</a>.</sup></p>
+   </td>
+   <td>
+    <p><i>The existence of a golem is sometimes a mixed blessing. Golems are not intelligent, and if commanded to perform a task, they will perform the instructions literally.</i></p>
+    <p align="right"><sup><a href="https://en.wikipedia.org/wiki/Golem">Wikipedia</a></sup></p>
+   </td>
+  </tr>
+</table>
 
 # Golem: Literate Dev-Ops With Bash and Markdown
 
