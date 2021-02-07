@@ -33,7 +33,7 @@ current_time=$(date)
 current_ip=$(curl -s ifconfig.me)
 current_load=$(uptime)
 current_name=$(hostname -f)
-mailto=$(need mailto -p "Email to:")
+mailto=$(needopt mailto -p "Email to:")
 cat <<ENDMAIL | mail -s "Status from $current_name" "$mailto"
 Time Now: $current_time
 Address:  $current_ip
@@ -173,7 +173,7 @@ Servers are accessed sequentially, not in parallel. A command script must finish
 
 ### Passing parameters on the commandline
 
-One of the examples above includes `--greeting "hello, world"`. Command scripts can use a Golem helper function called `need` to look for named longopts in the script invocation. That value is then loaded into a variable of the command script's choosing. This makes it convenient to handle complicated systems administration tasks by passing parameters like usernames and hostnames to command scripts as they're run on remote servers.
+One of the examples above includes `--greeting "hello, world"`. Command scripts can use a Golem helper function called `needopt` to look for named longopts in the script invocation. That value is then loaded into a variable of the command script's choosing. This makes it convenient to handle complicated systems administration tasks by passing parameters like usernames and hostnames to command scripts as they're run on remote servers.
 
 
 ## Writing a script
@@ -195,8 +195,9 @@ When it generates a command script from some source file -- whether a shell scri
 * `warn`: write a message to STDERR.
 * `fail`: write a message to STDERR and try to halt the script. Halting scripts from nested subshells is very hard in bash. Golem makes a good effort here but the fact is that it's not as bulletproof as I'd like it to be. Try to avoid calling `fail` from subshells.
 * `ask`: this is a really, really nice function that allows your script to prompt the user for yes/no responses or more complicated requests. It includes support for default values, automatic timeouts, and required values, and is very easy to use.
-* `need`: this function helps command scripts look for a named longopt value in the script's invocation and, if it's not present, ask the user for it.
-* some argument processing: a block near the bottom extracts any named longopt values from the argument list and stores them for use by the `need()` function.
+* `loadopt`: allows command scripts to retrieve the value of a named longopt provided by the user. `loadopt` returns a non-zero exit status code if the user didn't provide the named longopt. For example, `if username="$(loadopt "username")"; then echo "$username"; elso echo "No username"; fi` will display the value following "--username" on the commandline if it exists, or "No username" if it doesn't.
+* `needopt`: similar to `loadopt`, but treats the named longopt as a required value and displays a prompt if the value wasn't provided. `needopt` also allows command scripts to require a value to match a regular expression.
+* some argument processing: a block near the bottom extracts any named longopt values from the argument list and stores them for use by the `needopt()` function.
 
 You can find all of this code between the `# begin-golem-injected-code` and `# end-golem-injected-code` lines in the main Golem shell script. When building a command script, Golem reads its own file and copy-pastes this section into the top of the command script.
 

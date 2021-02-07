@@ -372,14 +372,41 @@ ask () {
     [[ "$ans" = "y" || "$ans" == "yes" ]]
 }
 
+
+##
+# Return the value of a named option passed from the commandline.
+# If it doesn't exist, exit with a non-zero status.
+# This function can be invoked like so:
+#     if var="$(loadopt "foo")"; then...
+# 
+loadopt () {
+    local varname="$1" value=""
+    declare -i found=1
+    # Run through the longopts array and search for a "varname".
+    for i in "${longopts[@]}"; do
+        if [ $found -eq 0 ]; then
+            value="$i"
+            break
+        fi
+        if [ "$i" = "--$varname" ]; then
+            # Matched varname, set found here so that the next loop iteration
+            # picks up varname's value.
+            found=0
+        fi
+    done
+    echo "$value"
+    return $found
+}
+
+
 ##
 # Require a named value from the user. If the value wasn't specified as a longopt
-# when the script was invoked, then need() will call ask() to request the value
+# when the script was invoked, then needopt() will call ask() to request the value
 # from the user. Use this to get required values for your scripts.
 #
-need () {
+needopt () {
     # Usage:
-    #     varname=$(need varname -p "Prompt to the user" -m [regex])
+    #     varname=$(needopt varname -p "Prompt to the user" -m [regex])
     local varname="" prompt="" match="" i="" found="" value=""
     while [ $# -gt 0 ] && [[ "$1" ]]; do
         case "$1" in
@@ -405,39 +432,27 @@ need () {
                     varname="$1"
                     shift
                 else
-                    fail "need(): Unexpected value: $1"
+                    fail "needopt(): Unexpected value: $1"
                 fi
             ;;
         esac
     done
     if [ -z "$varname" ]; then
-        fail "need(): No varname was provided"
+        fail "needopt(): No varname was provided"
     fi
     if [ -z "$prompt" ]; then
         prompt="$varname"
     fi
-    # Now run through the longopts array and search for a "varname".
-    for i in "${longopts[@]}"; do
-        if [ -n "$found" ]; then
-            value="$i"
-            break
-        fi
-        if [ "$i" = "--$varname" ]; then
-            # Matched varname, set found here so that the next loop iteration
-            # picks up varname's value.
-            found="$varname"
-        fi
-    done
-    while true; do
-        if [ -n "$value" ]; then
-            if [ -z "$match" ] || [[ $value =~ $match ]]; then
+    if ! value="$(loadopt "$varname")" || [[ ! $value =~ $match ]]; then
+        while true; do
+            value="$(ask -r "$prompt")"
+            if [ -n "$value" ] && [[ $value =~ $match ]]; then
                 break
-            else
-                warn "need(): this value doesn't match the expected regular expression: $match"
+            elif [ -n "$match" ]; then
+                warn "needopt(): this value doesn't match the expected regular expression: $match"
             fi
-        fi
-        value=$(ask -r "$prompt")
-    done
+        done
+    fi
     # printf -v "$varname" '%s' "$value"
     echo "$value"
     return 0
@@ -445,11 +460,11 @@ need () {
 
 
 # Process arguments. Golem will load any "--variable value" pairs into the
-# "longopts" array. Your command script can then call the need() function to
+# "longopts" array. Your command script can then call the needopt() function to
 # load this value into a variable.
 # Example: if your command script needs a "hostname" value, the user can supply
 # that with, "golem --hostname 'host.name' your command", and the "your_command.sh"
-# file can use "hostname=need(hostname)" to create a variable named "hostname"
+# file can use "hostname=needopt(hostname)" to create a variable named "hostname"
 # with the value "host.name" (or ask the user for it).
 declare -a longopts=()
 declare -a args=()
