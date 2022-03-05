@@ -65,9 +65,9 @@ _cache_update ()
                 fi
             fi
         ;;
-        .mdsh)
-            # If mdsh is present, then markdown files ending in ".mdsh" can be
-            # executed as commands if they pass all the sanity checks.
+        .md|.mdsh)
+            # If md or mdsh is present, then markdown files ending in ".mdsh" can
+            # be executed as commands if they pass all the sanity checks.
             mdsh=$(command -v mdsh)
             if [ -z "$mdsh" ]; then
                 fail "mdsh is not installed or available in the current \$PATH. See https://github.com/bashup/mdsh for more information."
@@ -90,7 +90,7 @@ _cache_update ()
             # mdsh may parse the file as a raw block; make sure that didn't happen.
             if ! grep -q -v '^\s*\(mdsh_raw[a-zA-Z_:-]*+=.*\)\?$' "$tempfile"; then
                 rm "$tempfile"
-                fail "mdsh did not correctly parse this file: \"$sourcefile\". Make sure it has code blocks beginning with \"\`\`\`bash\"."
+                fail "mdsh did not correctly parse this file: \"$sourcefile\". Make sure it has code blocks beginning with \"\`\`\`bash\" or \"\`\`\`shell\"."
             fi
             # So far, so good. Make sure the file has a "#!" near the top.
             # This is required for shellcheck to work properly.
@@ -119,8 +119,8 @@ _cache_update ()
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$tempfile" <(printf \\n) >"$cachedfile"
             if ! $shellcheck "$cachedfile" >/dev/null 2>&1; then
                 mv "$cachedfile" "$tempfile"
-                fail "\"$sourcefile\" was successfully converted to a shell script by mdsh but failed a shellcheck test when golem functions were added to it. You can review the compiled file at \"$tempfile\"."
                 cachedfile=""
+                fail "\"$sourcefile\" was successfully converted to a shell script by mdsh but failed a shellcheck test when golem functions were added to it. You can review the compiled file at \"$tempfile\"."
             fi
             # The markdown script passed all tests. Nice!
             rm "$tempfile"
