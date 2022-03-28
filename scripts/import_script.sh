@@ -58,6 +58,10 @@ _cache_update ()
             # this line noise.
             sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$sourcefile" <(printf \\n) >"$cachedfile"
+            # Add a wrapper around apt installations to catch errors and force
+            # bash to wait until the installation is concluded.
+            # https://github.com/robsheldon/golem/issues/1
+            sed -i -E -n 's/^(\s+)?(sudo\s*)?(apt(-get)?\s+)(install\s+)((-[a-zA-Z0-9-]+\s*)*)?(([a-zA-Z0-9:.+-]+\s*)+)$/\1echo "Installing: \8..."\n\1if \2\3\5\6\8 >\/dev\/null; then\n\1    echo "Successfully installed all packages"\n\1else\n\1    fail "Failed to install one or more of: \8"\n\1fi/;p' "$cachedfile"
             if [ -n "$shellcheck" ]; then
                 # Run shellcheck one more time on the completed cached file.
                 if ! $shellcheck "$cachedfile" >/dev/null 2>&1; then
@@ -117,6 +121,10 @@ _cache_update ()
             cachedfile="$scriptdir/.cache/$file_basename.sh"
             sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$scriptpath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$tempfile" <(printf \\n) >"$cachedfile"
+            # Add a wrapper around apt installations to catch errors and force
+            # bash to wait until the installation is concluded.
+            # https://github.com/robsheldon/golem/issues/1
+            sed -i -E -n 's/^(\s+)?(sudo\s*)?(apt(-get)?\s+)(install\s+)((-[a-zA-Z0-9-]+\s*)*)?(([a-zA-Z0-9:.+-]+\s*)+)$/\1echo "Installing: \8..."\n\1if \2\3\5\6\8 >\/dev\/null; then\n\1    echo "Successfully installed all packages"\n\1else\n\1    fail "Failed to install one or more of: \8"\n\1fi/;p' "$cachedfile"
             if ! $shellcheck "$cachedfile" >/dev/null 2>&1; then
                 mv "$cachedfile" "$tempfile"
                 cachedfile=""
