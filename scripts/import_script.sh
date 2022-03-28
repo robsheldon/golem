@@ -50,7 +50,7 @@ _cache_update ()
             # Shellcheck succeeded or is not available.
             cachedfile="$scriptdir/.cache/$file_basename.sh"
             # Nuke the 'sudo warmup' if it's not needed for this script.
-            if ! grep -q '^[[:space:]]*sudo ' "$sourcefile"; then
+            if ! grep -q '^[[:space:]]*\(if[[:space:]]*\)\?sudo ' "$sourcefile"; then
                 sudowarmup=""
             fi
             # Inject the golem public code into this shell script.
@@ -114,7 +114,7 @@ _cache_update ()
                 fail "The file converted by mdsh did not pass shellcheck. You can review the compiled file at \"$tempfile\"."
             fi
             # Nuke the 'sudo warmup' if it's not needed for this script.
-            if ! grep -q '^[[:space:]]*sudo ' "$tempfile"; then
+            if ! grep -q '^[[:space:]]*\(if[[:space:]]*\)\?sudo ' "$tempfile"; then
                 sudowarmup=""
             fi
             # Use the sed line noise to generate the file in the cache.
