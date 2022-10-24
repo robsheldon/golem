@@ -586,9 +586,13 @@ else
             if [ -z "$ssh_host" ]; then
                 fail "your ssh configuration did not return a valid hostname for the remote destination $destination"
             fi
-            hostaddr=$(ping -q -n -c 1 -t 1 -w 1 "$ssh_host" 2>&1 | grep -Po "\\b$ssh_host\\s+\\([^\\(\\)]+\\)")
+            hostaddr=$(ping -q -n -c 1 -t 1 -w 1 "$ssh_host" 2>&1 | head -n 1 | grep -Po "\\b$destination\\s+\\([^\\(\\)]+\\)")
             if [ -z "$hostaddr" ]; then
-                fail "$destination could not be resolved to a valid network address"
+                # Try the hostname retrieved from the ssh config.
+                hostaddr=$(ping -q -n -c 1 -t 1 -w 1 "$ssh_host" 2>&1 | head -n 1 | grep -Po "\\b$ssh_host\\s+\\([^\\(\\)]+\\)")
+                if [ -z "$hostaddr" ]; then
+                    fail "$destination could not be resolved to a valid network address"
+                fi
             fi
             # Okay. Run this command script on a remote host.
             ssh -qt "$destination" /bin/bash "<(echo \"$scripthack\" | base64 --decode)" "${longopts[*]}" "$*"
