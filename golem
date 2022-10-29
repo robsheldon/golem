@@ -571,7 +571,7 @@ else
     fi
     if [ ${#destinations[@]} -eq 0 ]; then
         # No remote destinations, run command script locally.
-        $scriptshell "$command_script" "${longopts[@]}" $*
+        $scriptshell "$command_script" "$(printf '%q ' "${longopts[@]}")" "$(printf '%q ' "$@")"
     else
         # One or more remote destinations.
         # Start by converting the selected command script into a base64 blob.
@@ -595,7 +595,7 @@ else
                 fi
             fi
             # Okay. Run this command script on a remote host.
-            ssh -qt "$destination" /bin/bash "<(echo \"$scripthack\" | base64 --decode)" "${longopts[*]}" "$*"
+            ssh -qt "$destination" /bin/bash "<(echo \"$scripthack\" | base64 --decode)" "$(printf '%q ' "${longopts[@]}")" "$(printf '%q ' "$@")"
         done
     fi
 fi
