@@ -17,19 +17,12 @@ _cache_update ()
     if [ "$file_basename" = "import_script" ]; then
         fail "You have tried to import the import script. That is probably not what you intended, so have this error message instead."
     fi
-    # Delete any copies of this file currently in the cache.
-    find -P "$scriptdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
-    # Also delete any previous "-failed" scripts (files that did not successfully
-    # get imported).
+    # Delete any previous "-failed" scripts (files that did not successfully get imported).
     find -P "$scriptdir/scripts" -maxdepth 1 -name "$file_basename.*-failed" -delete
     sourcefiles=("$scriptdir"/scripts/"$file_basename".*)
     if [ ${#sourcefiles[@]} -gt 1 ]; then
         fail "There are multiple files in the $scriptdir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
-    fi
-    if [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
-        # TODO: It would be pretty cool if the .cache directory weren't already
-        # cleaned up at this point and a cached copy of this file could be
-        # retrieved if some disaster had befallen the hapless user.
+    elif [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptdir/scripts/$file_basename.*" ]; then
         fail "The original source file matching \"$file_basename\" has disappeared."
     fi
     sourcefile="${sourcefiles[0]}"
