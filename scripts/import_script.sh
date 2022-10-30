@@ -179,19 +179,22 @@ _import_script () {
             fail "file exists but is not readable: $sourcefile" 
         fi
         destfile=$(echo "$destcmd" | sed 's/ \+/_/g')
-        matched=$(find -P "$scriptdir/scripts" -maxdepth 1 -name "$destfile.*")
-        if [ -n "$matched" ]; then
-            matched=$(path_filename "$matched")
-            if ! ask "\"$destcmd\" matches the file \"$matched\" in scripts/. Do you want to replace this file?"; then
-                echo "Canceled."
-                exit 1
-            else
-                rm "$scriptdir/scripts/$matched"
-            fi
-        fi
         dest_ext=$(path_extension "$sourcefile")
-        if ! cp "$sourcefile" "$scriptdir/scripts/$destfile$dest_ext"; then
-            fail "Copy failed."
+        # Don't remove or overwrite the file that's about to be imported if the user tries to do that. (!)
+        if [ "$(realpath -m "$scriptdir/scripts/$destfile$dest_ext")" != "$(realpath -m "$sourcefile")" ]; then
+            matched=$(find -P "$scriptdir/scripts" -maxdepth 1 -name "$destfile.*")
+            if [ -n "$matched" ]; then
+                matched=$(path_filename "$matched")
+                if ! ask "\"$destcmd\" matches the file \"$matched\" in scripts/. Do you want to replace this file?"; then
+                    echo "Canceled."
+                    exit 1
+                else
+                    rm "$scriptdir/scripts/$matched"
+                fi
+            fi
+            if ! cp "$sourcefile" "$scriptdir/scripts/$destfile$dest_ext"; then
+                fail "Copy failed."
+            fi
         fi
         cached=$(_cache_update "$destfile")
         if [ -f "$cached" ]; then
