@@ -15,7 +15,7 @@ _cache_update ()
     filename="$1"
     file_basename="$(path_basename "$filename")"
     if [ "$file_basename" = "import_script" ]; then
-        fail "You have tried to import the import script. The infinite recursion that would result would cause a singularity that would eventually expand into all of time and space. That is probably not what you intended, so have this error message instead."
+        fail "You have tried to import the import script. That is probably not what you intended, so have this error message instead."
     fi
     # Delete any copies of this file currently in the cache.
     find -P "$scriptdir/.cache" -maxdepth 1 -name "$file_basename.*" -delete
