@@ -70,7 +70,16 @@ _cache_check () {
     # the input glob if no matches were found, but future versions may change
     # this behavior.
     if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$scriptdir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$scriptdir/scripts/$file_basename.*" ]; then
-        # Found one match of each, timestamps can be compared.
+        # Try a hash comparison first.
+        cached_hash="$(head -n 10 "${cachedfiles[0]}" | grep -oP '(?<=^# source hash: )[0-9a-f]{32}')"
+        if [ -n "$cached_hash" ] && [ "$cached_hash" = "$(md5sum "${sourcefiles[0]}" | grep -oP '^[0-9a-f]{32}')" ]; then
+            # Good enough. This allows for timestamp mismatches between cached
+            # scripts and their source files so long as the content of the source
+            # file hasn't changed.
+            echo "${cachedfiles[0]}"
+            return 0
+        fi
+        # Hash not stored in cached script, or hash mismatch. Compare timestamps.
         cached_ts=$(date -r "${cachedfiles[0]}" '+%s')
         source_ts=$(date -r "${sourcefiles[0]}" '+%s')
         if [ "$cached_ts" = "$source_ts" ]; then
