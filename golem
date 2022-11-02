@@ -25,10 +25,13 @@ batch=0
 # directory whose name best matches the command the user wants to run.
 # 
 _find_cmd_file () {
-    # Make sure the local "scripts" and ".cache" directories are present.
-    mkdir -p "$scriptdir"/scripts
-    mkdir -p "$scriptdir"/.cache
-    for lookdir in ".cache" "scripts"; do
+    cmdstring="$1"
+    shift
+    for lookdir in "$@"; do
+        # Ensure the directory exists.
+        if [ ! -d "$scriptdir/$lookdir" ]; then
+            continue
+        fi
         # Iterate over the list of files in this directory from longest file
         # name to shortest.
         # The correct way to do this is to redirect the output from this nasty
@@ -43,7 +46,7 @@ _find_cmd_file () {
             # Convert the filename into a regular expression...
             regex=$(path_basename "$filename" | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
             # ...and then try to match it against the entered command.
-            if echo "$*" | grep -q "^$regex"; then
+            if echo "$cmdstring" | grep -q "^$regex"; then
                 echo "$filename"
                 return 0
             fi
@@ -100,11 +103,10 @@ _cache_check () {
 # Translate a given command string into a matching script to be run.
 #
 _shell_resolve_cmd () {
-    command_string="$*"
     i=5
     while [ $i -gt 0 ]; do
         i=$((i-1))
-        matchfile=$(_find_cmd_file "$command_string")
+        matchfile=$(_find_cmd_file "$@")
         if [ -z "$matchfile" ]; then
             # Nothing found in either the scripts/ directory or the cache. The
             # caller will handle this with an error message.
@@ -574,7 +576,7 @@ if [ $# -gt 2 ] && [ "$1" = "import" ] && [ "$2" = "script" ]; then
     shift; shift
     _import_script "$@"
 else
-    command_script=$(_shell_resolve_cmd "$*")
+    command_script=$(_shell_resolve_cmd "$*" ".cache" "scripts")
     if [ -z "$command_script" ]; then
         fail "No matching command script found for \"$*\""
     fi
