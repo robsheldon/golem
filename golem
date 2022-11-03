@@ -42,7 +42,13 @@ _find_cmd_file () {
         # which prevents later code from accessing any variables that are set,
         # exit doesn't work because the pipe is a subshell (it just exits the
         # pipe). So ... early return from a function!
-        for scriptfile in "$scriptdir"/"$lookdir"/*; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+        for scriptfile in "$scriptdir"/"$lookdir"/*.{sh,md,mdsh}; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+            if [ ! -f "$filename" ]; then
+                # "Null globbing": patterns which don't match any files will
+                # return the pattern. `shopt -s nullglob` also fixes this, but
+                # testing for the file's existence is more portable.
+                continue
+            fi
             # Convert the filename into a regular expression...
             regex=$(path_basename "$filename" | sed 's/_/[[:space:]]\\{1,\\}.*[[:space:]]*/g')
             # ...and then try to match it against the entered command.
