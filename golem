@@ -345,9 +345,9 @@ _shell_resolve_cmd () {
 
 # Use any of these as necessary.
 # shellcheck disable=SC2034
-scriptname=$(basename "$_")
+scriptpath=$(readlink -m "$BASH_SOURCE")
 # shellcheck disable=SC2034
-scriptpath=$(readlink -m "$0")
+scriptname=$(basename "$scriptpath")
 # shellcheck disable=SC2034
 scriptdir=$(dirname "$scriptpath")
 # shellcheck disable=SC2034
