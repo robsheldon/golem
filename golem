@@ -29,7 +29,7 @@ _find_cmd_file () {
     shift
     for lookdir in "$@"; do
         # Ensure the directory exists.
-        if [ ! -d "$mydir/$lookdir" ]; then
+        if [ ! -d "$lookdir" ]; then
             continue
         fi
         # Iterate over the list of files in this directory from longest file
@@ -42,7 +42,7 @@ _find_cmd_file () {
         # which prevents later code from accessing any variables that are set,
         # exit doesn't work because the pipe is a subshell (it just exits the
         # pipe). So ... early return from a function!
-        for scriptfile in "$mydir"/"$lookdir"/*.{sh,md,mdsh}; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
+        for scriptfile in "$lookdir"/*.{sh,md,mdsh}; do echo ${#scriptfile} "$scriptfile"; done | sort -rn | cut -d " " -f 2 | while read -r filename; do
             if [ ! -f "$filename" ]; then
                 # "Null globbing": patterns which don't match any files will
                 # return the pattern. `shopt -s nullglob` also fixes this, but
@@ -71,11 +71,11 @@ _cache_update ()
     filename="$1"
     file_basename="$(path_basename "$filename")"
     # Delete any previous "-failed" scripts (files that did not successfully get imported).
-    find -P "$mydir/scripts" -maxdepth 1 -name "$file_basename.*-failed" -delete
-    sourcefiles=("$mydir"/scripts/"$file_basename".*)
+    find -P "$scriptspath" -maxdepth 1 -name "$file_basename.*-failed" -delete
+    sourcefiles=("$scriptspath"/"$file_basename".*)
     if [ ${#sourcefiles[@]} -gt 1 ]; then
-        fail "There are multiple files in the $mydir/scripts matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
-    elif [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$mydir/scripts/$file_basename.*" ]; then
+        fail "There are multiple files in \"$scriptspath\" matching the pattern $file_basename.*. There should be only one match for that pattern. Please rename some of them."
+    elif [ ${#sourcefiles[@]} -lt 1 ] || [ "${sourcefiles[0]}" = "$scriptspath/$file_basename.*" ]; then
         fail "The original source file matching \"$file_basename\" has disappeared."
     fi
     sourcefile="${sourcefiles[0]}"
@@ -98,7 +98,7 @@ _cache_update ()
                 fi
             fi
             # Shellcheck succeeded or is not available.
-            cachedfile="$mydir/.cache/$file_basename.sh"
+            cachedfile="$cachepath/$file_basename.sh"
             # Nuke the 'sudo warmup' if it's not needed for this script.
             if ! grep -q '^[[:space:]]*\(if[[:space:]]*\)\?sudo ' "$sourcefile"; then
                 sudowarmup=""
@@ -137,6 +137,7 @@ _cache_update ()
             # language blocks; it natively only handles "shell" language blocks.
             # That function gets injected into the top of the input and then
             # passed to mdsh.
+            # shellcheck disable=SC2016
             if ! echo -e '```shell @mdsh\nmdsh-compile-bash(){ printf "%s" "$1";}\n```\n\n' | cat - "$sourcefile" | $mdsh --compile - >"$tempfile" 2>&1; then
                 rm "$tempfile"
                 fail "mdsh was unable to parse this file: \"$sourcefile\""
@@ -168,7 +169,7 @@ _cache_update ()
                 sudowarmup=""
             fi
             # Use the sed line noise to generate the file in the cache.
-            cachedfile="$mydir/.cache/$file_basename.sh"
+            cachedfile="$cachepath/$file_basename.sh"
             sed -n "/^# begin-golem-injected-code$/,/^# end-golem-injected-code$/p" "$mypath" | xargs -0 printf "\\n$warning\\n%s\\n$sudowarmup" | sed '/^\s*[^#]\+/{;r /dev/stdin
                 N;:l;$!n;$!bl;};${;/^$/!{;s/\\n$//;};//d;}' "$tempfile" <(printf \\n) >"$cachedfile"
             # Add a wrapper around apt installations to catch errors and force
@@ -187,7 +188,7 @@ _cache_update ()
             # All other file types: just copy the file into the cache and hope
             # the user knows what they're doing.
             filename=$(path_filename "$sourcefile")
-            cachedfile="$mydir/.cache/$filename"
+            cachedfile="$cachepath/$filename"
             cp "$sourcefile" "$cachedfile"
         ;;
     esac
@@ -235,21 +236,22 @@ _import_script () {
         elif [ ! -r "$sourcefile" ]; then
             fail "file exists but is not readable: $sourcefile" 
         fi
+        # shellcheck disable=SC2001
         destfile=$(echo "$destcmd" | sed 's/ \+/_/g')
         dest_ext=$(path_extension "$sourcefile")
         # Don't remove or overwrite the file that's about to be imported if the user tries to do that. (!)
-        if [ "$(realpath -m "$mydir/scripts/$destfile$dest_ext")" != "$(realpath -m "$sourcefile")" ]; then
-            matched=$(find -P "$mydir/scripts" -maxdepth 1 -name "$destfile.*")
+        if [ "$(realpath -m "$scriptspath/$destfile$dest_ext")" != "$(realpath -m "$sourcefile")" ]; then
+            matched=$(find -P "$scriptspath" -maxdepth 1 -name "$destfile.*")
             if [ -n "$matched" ]; then
                 matched=$(path_filename "$matched")
-                if ! ask "\"$destcmd\" matches the file \"$matched\" in scripts/. Do you want to replace this file?"; then
+                if ! ask "\"$destcmd\" matches the file \"$matched\" in $scriptsdirname/. Do you want to replace this file?"; then
                     echo "Canceled."
                     exit 1
                 else
-                    rm "$mydir/scripts/$matched"
+                    rm "$scriptspath/$matched"
                 fi
             fi
-            if ! cp "$sourcefile" "$mydir/scripts/$destfile$dest_ext"; then
+            if ! cp "$sourcefile" "$scriptspath/$destfile$dest_ext"; then
                 fail "Copy failed."
             fi
         fi
@@ -272,13 +274,13 @@ _import_script () {
 _cache_check () {
     file_basename="$1"
     # Locate matching source and cache file(s).
-    sourcefiles=("$mydir"/scripts/"$file_basename".*)
-    cachedfiles=("$mydir"/.cache/"$file_basename".*)
+    sourcefiles=("$scriptspath"/"$file_basename".*)
+    cachedfiles=("$cachepath"/"$file_basename".*)
     # See if a cache update can be skipped.
     # The current version of bash should return a single-element array containing
     # the input glob if no matches were found, but future versions may change
     # this behavior.
-    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$mydir/.cache/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$mydir/scripts/$file_basename.*" ]; then
+    if [ ${#cachedfiles[@]} -eq 1 ] && [ ${#sourcefiles[@]} -eq 1 ] && [ "${cachedfiles[0]}" != "$cachepath/$file_basename.*" ] && [ "${sourcefiles[0]}" != "$scriptspath/$file_basename.*" ]; then
         # Try a hash comparison first.
         cached_hash="$(head -n 10 "${cachedfiles[0]}" | grep -oP '(?<=^# source hash: )[0-9a-f]{32}')"
         if [ -n "$cached_hash" ] && [ "$cached_hash" = "$(md5sum "${sourcefiles[0]}" | grep -oP '^[0-9a-f]{32}')" ]; then
@@ -344,8 +346,11 @@ _shell_resolve_cmd () {
 # begin-golem-injected-code
 
 # Use any of these as necessary.
+# Further reading on "$0" vs "$BASH_SOURCE" &etc.:
+# https://stackoverflow.com/a/35006505
+# https://stackoverflow.com/a/29835459
 # shellcheck disable=SC2034
-mypath=$(readlink -m "$BASH_SOURCE")
+mypath=$(readlink -m "${BASH_SOURCE[0]}")
 # shellcheck disable=SC2034
 myname=$(basename "$mypath")
 # shellcheck disable=SC2034
@@ -716,6 +721,10 @@ unset args
 
 # end-golem-injected-code
 
+scriptsdirname="scripts"
+cachedirname=".cache"
+scriptspath="$mydir/$scriptsdirname"
+cachepath="$mydir/$cachedirname"
 
 # Extract any destinations from the arguments list.
 declare -a destinations=()
@@ -752,14 +761,14 @@ fi
 # A "scripts" directory should be present in the parent directory.
 # This doesn't get automatically fixed because it's indicative of something
 # unusual about the environment.
-if [ ! -d "$mydir/scripts" ]; then
-    fail "The \"scripts\" directory is missing from \"$mydir\". It should have been included in the repository. Please create it manually."
+if [ ! -d "$scriptspath" ]; then
+    fail "The \"$scriptsdirname\" directory is missing from \"$mydir\". It should have been included in the repository. Please create it manually."
 fi
 # The .cache directory should exist because _import_script() uses it to sanity-
 # check the environment. This can be created if it's not present.
-if [ ! -d "$mydir/.cache" ]; then
-    if ! mkdir -p "$mydir/.cache"; then
-        fail "\"$mydir/.cache doesn't exist and could not be created. Please create it manually and try again."
+if [ ! -d "$cachepath" ]; then
+    if ! mkdir -p "$cachepath"; then
+        fail "\"$cachepath\" doesn't exist and could not be created. Please create it manually and try again."
     fi
 fi
 
@@ -768,7 +777,7 @@ if [ $# -gt 2 ] && [ "$1" = "import" ] && [ "$2" = "script" ]; then
     shift; shift
     _import_script "$@"
 else
-    command_script=$(_shell_resolve_cmd "$*" ".cache" "scripts")
+    command_script=$(_shell_resolve_cmd "$*" "$cachepath" "$scriptspath")
     if [ -z "$command_script" ]; then
         fail "No matching command script found for \"$*\""
     fi
