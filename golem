@@ -257,7 +257,7 @@ _import_script () {
         fi
         cached=$(_cache_update "$destfile")
         if [ -f "$cached" ]; then
-            echo "Successfully imported \"$destcmd\" as \"$destfile$dest_ext\""
+            echo "Successfully imported \"$destfile$dest_ext\" as \"$destcmd\""
         else
             fail "$cached"
         fi
@@ -774,7 +774,7 @@ if [ ! -d "$cachepath" ]; then
     fi
 fi
 
-if [ $# -gt 2 ] && [ "$1" = "import" ] && [ "$2" = "script" ]; then
+if [ "${*:1:2}" = "import script" ]; then
     # When invoked by the user, the "import script" words need to be shifted.
     shift; shift
     _import_script "$@"
