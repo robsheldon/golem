@@ -695,12 +695,14 @@ while [ $# -gt 0 ] && [[ "$1" ]]; do
             break
             ;;
         --*)
-            if [ $# -lt 2 ]; then
-                fail "Missing value for $1"
+            longopts+=("$1")
+            shift
+            if [ $# -lt 1 ] || [[ "$1" =~ ^--.+ ]]; then
+                longopts+=("")
+            else
+                longopts+=("$1")
+                shift
             fi
-            longopts+=("$(printf '%s' "$1")")
-            longopts+=("$(printf '%s' "$2")")
-            shift 2
             ;;
         *)
             args+=("$1")
@@ -783,7 +785,7 @@ else
     fi
     if [ ${#destinations[@]} -eq 0 ]; then
         # No remote destinations, run command script locally.
-        $myshell "$command_script" "$(printf '%q ' "${longopts[@]}" "$@")"
+        $myshell "$command_script" "$@" "${longopts[@]}"
     else
         # One or more remote destinations.
         # Start by converting the selected command script into a base64 blob.
