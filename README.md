@@ -21,7 +21,7 @@
 
 * an agent-less tool for literate devops, designed to work well with [mdsh](https://github.com/bashup/mdsh), so you can write executable documentation for your infrastructure.
 
-Golem is not intended to replace bigger, popular infrastructure management systems like Ansible, but it should be a useful tool for people who like documentation and shell scripts and have a handful of servers to look after.
+Golem is not intended to replace bigger, popular infrastructure management systems like Ansible, but it could be a useful tool for people who like documentation and shell scripts and only have a handful of servers to look after.
 
 
 # An example
@@ -216,8 +216,11 @@ Knuth [described literate programming back in 1992](https://www-cs-faculty.stanf
 
 ## As An Exercise
 
-I discovered [mdsh](https://github.com/bashup/mdsh), which gracefully handled all the hard work of constructing a shell script from a markdown document. Next, I just needed a way to manage the documents and scripts, and then execute them remotely, along with a few other nice-to-haves. I iteratively built Golem to do just that. It gave me an excuse to become very familiar with shellcheck and to clean up all of my documentation until I could run any of it on a remote system with a single command.
+I discovered [mdsh](https://github.com/bashup/mdsh), which gracefully handled all the hard work of constructing a shell script from a markdown document. I just needed a way to manage the documents and scripts, and then execute them remotely, along with a few other nice-to-haves. I iteratively built Golem to do just that. It gave me an excuse to become very familiar with shellcheck and to clean up all of my documentation until I could run any of it on a remote system with a single command.
 
+## To refine my shell code
+
+I *like* shell scripts. I've been writing them since 2005 at leaat -- back when `/etc/init.d` ruled everything. And, I *like* documentation -- good documentation, anyway. `shellcheck` encouraged me to spend more time thinking about *idiomatic* shell programming: ensuring the details were all correct and consistent across the years of documentation and bits of shell code I had accumulated.
 
 # Status
 
