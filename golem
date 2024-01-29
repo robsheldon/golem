@@ -388,7 +388,7 @@ path_filename () {
 path_directory () {
     local filename=""
     filename=$(path_filename "$1")
-    realpath -s -m "${1%$filename}"
+    realpath -s -m "${1%"$filename"}"
 }
 
 
@@ -417,7 +417,7 @@ path_extension () {
     local filename="" basename=""
     filename=$(path_filename "$1")
     basename=$(path_basename "$filename")
-    echo "${filename##$basename}"
+    echo "${filename##"$basename"}"
 }
 
 
@@ -568,7 +568,7 @@ ask () {
                     ans=$default
                 fi
             elif [ $required -eq 0 ]; then
-                ans=$(tr '[:upper:]' '[:lower:]' <<< $ans)
+                ans=$(tr '[:upper:]' '[:lower:]' <<< "$ans")
                 if [ "$ans" = "yes" ]; then
                     ans="y"
                 elif [ "$ans" = "no" ]; then
@@ -586,7 +586,7 @@ ask () {
     done
 
     if [ $required -eq 1 ]; then
-        echo $ans
+        echo "$ans"
         return 0
     fi
 
