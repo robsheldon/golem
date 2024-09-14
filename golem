@@ -178,7 +178,7 @@ _cache_update ()
             # bash to wait until the installation is concluded.
             # https://github.com/robsheldon/golem/issues/1
             sed -i -E -n 's/^(\s+)?(sudo\s*)?(apt(-get)?\s+)(install\s+)((-[a-zA-Z0-9-]+\s*)*)?(([a-zA-Z0-9:.+-]+\s*)+)$/\1echo "Installing: \8..."\n\1if \2\3\5\6\8 >\/dev\/null; then\n\1    echo "Successfully installed all packages"\n\1else\n\1    fail "Failed to install one or more of: \8"\n\1fi/;p' "$cachedfile"
-            if ! sc_out="$($shellcheck -f tty --color -e SC2119 "$cachedfile")"; then
+            if ! sc_out="$($shellcheck -f tty --color -e SC2119 -e SC2317 "$cachedfile")"; then
                 rm "$cachedfile"
                 cachedfile=""
                 echo -e "$sc_out\n\n"
@@ -439,7 +439,7 @@ random_string () {
     else
         num_chars=$((12 + RANDOM % 12))
     fi
-    tr -dc _A-Z-a-z-0-9 < /dev/urandom | tr -d '/+oO0lLiI1\n\r' | head -c $num_chars
+    tr -dc _A-Z-a-z-0-9 < /dev/urandom | tr -d '/+oO0lLiI1\n\r' | head -c "$num_chars"
 }
 
 
@@ -527,7 +527,7 @@ ask () {
         warn "ask(): Non-zero timeout requires a default answer"
         exit 1
     fi
-    if [ $required -ne 0 ]; then
+    if [ "$required" -ne 0 ]; then
         if [ -n "$default" ] || [ "$timeout" -gt 0 ]; then
             warn "ask(): 'required' is not compatible with 'default' or 'timeout' parameters."
             exit 1
@@ -543,7 +543,7 @@ ask () {
         prompt="$prompt [Y/n] "
     elif [ "$default" = "n" ]; then
         prompt="$prompt [y/N] "
-    elif [ $required -eq 1 ]; then
+    elif [ "$required" -eq 1 ]; then
         prompt="$prompt (required) "
     else
         prompt="$prompt [y/n] "
@@ -564,13 +564,13 @@ ask () {
         else
             read -r -p "$prompt" ans <"$(tty)"
             if [[ ! "$ans" ]]; then
-                if [ $required -eq 1 ]; then
+                if [ "$required" -eq 1 ]; then
                     warn "An answer is required."
                     ans=""
                 else
                     ans=$default
                 fi
-            elif [ $required -eq 0 ]; then
+            elif [ "$required" -eq 0 ]; then
                 ans=$(tr '[:upper:]' '[:lower:]' <<< "$ans")
                 if [ "$ans" = "yes" ]; then
                     ans="y"
@@ -580,7 +580,7 @@ ask () {
             fi 
         fi
 
-        if [ $required -eq 0 ]; then
+        if [ "$required" -eq 0 ]; then
             if [ "$ans" != 'y' ] && [ "$ans" != 'n' ]; then
                 warn "Invalid answer. Please use y or n."
                 ans=""
@@ -588,7 +588,7 @@ ask () {
         fi
     done
 
-    if [ $required -eq 1 ]; then
+    if [ "$required" -eq 1 ]; then
         echo "$ans"
         return 0
     fi
