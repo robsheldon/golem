@@ -178,11 +178,10 @@ _cache_update ()
             # bash to wait until the installation is concluded.
             # https://github.com/robsheldon/golem/issues/1
             sed -i -E -n 's/^(\s+)?(sudo\s*)?(apt(-get)?\s+)(install\s+)((-[a-zA-Z0-9-]+\s*)*)?(([a-zA-Z0-9:.+-]+\s*)+)$/\1echo "Installing: \8..."\n\1if \2\3\5\6\8 >\/dev\/null; then\n\1    echo "Successfully installed all packages"\n\1else\n\1    fail "Failed to install one or more of: \8"\n\1fi/;p' "$cachedfile"
-            if ! sc_out="$($shellcheck -f tty --color -e SC2119 -e SC2317 "$cachedfile")"; then
+            if ! sc_out="$($shellcheck -f tty --color -e SC2119 -e SC2317 "$cachedfile" 2>&1)"; then
                 rm "$cachedfile"
                 cachedfile=""
-                echo -e "$sc_out\n\n"
-                fail "\"$sourcefile\" was successfully converted to a shell script by mdsh but failed a shellcheck test when golem functions were added to it."
+                fail "$sc_out\n\n\"$sourcefile\" was successfully converted to a shell script by mdsh but failed a shellcheck test when golem functions were added to it."
             fi
             # The markdown script passed all tests. Nice!
             rm "$tempfile"
@@ -455,7 +454,7 @@ warn () {
 # Write a message to stderr and exit immediately with a non-zero code.
 #
 fail () {
-    echo "ERROR: $*" | fmt -w 80 >&2
+    echo -e "ERROR: $*" >&2
     pkill -TERM -g $$ "$myname" || kill TERM $$ >/dev/null 2>&1
     exit 1
 }
