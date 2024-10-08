@@ -603,22 +603,20 @@ ask () {
 #     if var="$(loadopt "foo")"; then...
 # 
 loadopt () {
-    local varname="$1" value=""
-    declare -i found=1
+    local varname="$1" value="" found=""
     # Run through the longopts array and search for a "varname".
     for i in "${longopts[@]}"; do
-        if [ $found -eq 0 ]; then
-            value="$i"
-            break
-        fi
-        if [ "$i" = "--$varname" ]; then
+        if [ -n "$found" ]; then
+            echo "$i"
+            return 0
+        elif [ "$i" = "--$varname" ]; then
             # Matched varname, set found here so that the next loop iteration
             # picks up varname's value.
-            found=0
+            found="$varname"
         fi
     done
-    echo "$value"
-    return $found
+    echo ""
+    [ -n "$found" ]
 }
 
 
